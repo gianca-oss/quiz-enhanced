@@ -1,7 +1,7 @@
 // api/analyze-with-docs.js - Versione con supporto documenti da GitHub
 
 // URL base per i file preprocessati su GitHub
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/gianca-oss/quiz-enhanced/main/data/processed-v2/';
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/gianca-oss/quiz-enhanced/main/data/processed-v3/';
 
 // Cache per i dati
 let dataCache = null;
