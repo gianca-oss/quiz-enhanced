@@ -1,7 +1,6 @@
 // api/analyze-with-docs.js - Versione con supporto documenti da GitHub
 
 // URL base per i file preprocessati su GitHub
-// IMPORTANTE: Sostituisci con il tuo username e repository
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/gianca-oss/quiz-enhanced/main/data/processed-v2/';
 
 // Cache per i dati
@@ -27,21 +26,47 @@ async function loadProcessedData() {
         const searchIndexResponse = await fetch(GITHUB_RAW_BASE + 'search-index.json');
         const searchIndex = searchIndexResponse.ok ? await searchIndexResponse.json() : null;
         
-        // Carica il primo file di chunks (di solito contiene i più importanti)
-        const chunks0Response = await fetch(GITHUB_RAW_BASE + 'chunks_0.json');
-        if (!chunks0Response.ok) {
-            throw new Error('Chunks non trovati');
+        // Carica TUTTI i file chunks disponibili
+        const allChunks = [];
+        let chunkFileIndex = 0;
+        let consecutiveFailures = 0;
+        
+        console.log('📖 Caricamento chunks...');
+        
+        while (consecutiveFailures < 2) { // Continua finché non trova 2 file mancanti consecutivi
+            try {
+                const chunkResponse = await fetch(GITHUB_RAW_BASE + `chunks_${chunkFileIndex}.json`);
+                
+                if (chunkResponse.ok) {
+                    const chunks = await chunkResponse.json();
+                    allChunks.push(...chunks);
+                    console.log(`  ✓ chunks_${chunkFileIndex}.json - ${chunks.length} chunks caricati`);
+                    consecutiveFailures = 0; // Reset counter
+                } else {
+                    consecutiveFailures++;
+                    console.log(`  ✗ chunks_${chunkFileIndex}.json - non trovato`);
+                }
+                
+                chunkFileIndex++;
+                
+                // Limite di sicurezza
+                if (chunkFileIndex > 50) break;
+                
+            } catch (error) {
+                consecutiveFailures++;
+                console.log(`  ✗ chunks_${chunkFileIndex}.json - errore caricamento`);
+            }
         }
-        const chunks = await chunks0Response.json();
+        
+        console.log(`✅ Totale chunks caricati: ${allChunks.length}`);
         
         dataCache = {
             metadata,
             searchIndex,
-            chunks,
-            version: 'github-hosted'
+            chunks: allChunks,
+            version: 'github-hosted-complete'
         };
         
-        console.log('✅ Dati caricati da GitHub');
         return dataCache;
         
     } catch (error) {
