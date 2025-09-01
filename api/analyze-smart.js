@@ -548,15 +548,15 @@ DOMANDE DA ANALIZZARE:`;
 A) ${q.options.A || 'N/A'} B) ${q.options.B || 'N/A'} C) ${q.options.C || 'N/A'} D) ${q.options.D || 'N/A'}`;
     });
 
-    basePrompt += `\n\n**OUTPUT RICHIESTO - TABELLA SINTETICA A 2 COLONNE:**
+    basePrompt += `\n\n**OUTPUT RICHIESTO:**
 
-Genera SOLO questa tabella HTML semplificata con le risposte (SENZA STILI INLINE):
-
+1. TABELLA RISULTATI (3 colonne, SENZA STILI INLINE):
 <table class="quiz-results-table">
 <thead>
 <tr>
-<th>Domanda</th>
+<th>N°</th>
 <th>Risposta</th>
+<th>Accuratezza</th>
 </tr>
 </thead>
 <tbody>`;
@@ -565,13 +565,32 @@ Genera SOLO questa tabella HTML semplificata con le risposte (SENZA STILI INLINE
         basePrompt += `
 <tr>
 <td class="question-number">${q.number}</td>
-<td class="answer-letter">[SOLO LETTERA: A/B/C/D]</td>
+<td class="answer-letter">[A/B/C/D]</td>
+<td class="accuracy-percentage">[XX%]</td>
 </tr>`;
     });
     
     basePrompt += `
 </tbody>
 </table>
+
+2. ANALISI DETTAGLIATA:
+Per ogni domanda, fornisci:
+
+<div class="question-analysis">
+<h4>Domanda ${questions[0]?.number || '1'}</h4>
+<p class="question-text">[Trascrivi il testo completo della domanda]</p>
+<p class="answer-explanation"><strong>Risposta: [LETTERA]</strong> - [Spiegazione del perché questa è la risposta corretta]</p>
+<p class="source-info">Fonte: [Pagina X del documento / Conoscenza generale]</p>
+</div>
+
+Ripeti per ogni domanda.
+
+IMPORTANTE:
+- Nella tabella: SOLO numeri, lettere e percentuali
+- Percentuali realistiche: 95-100% se trovato nel documento, 60-80% se dedotto, 40-60% se incerto
+- Nell'analisi: spiega chiaramente il ragionamento
+- Indica SEMPRE la fonte (documento con pagina o conoscenza generale)
 
 DOPO LA TABELLA:
 Aggiungi una breve analisi (MAX 2 righe per domanda) con il ragionamento chiave.
@@ -614,13 +633,15 @@ DOMANDE:`;
 A) ${q.options.A} B) ${q.options.B} C) ${q.options.C} D) ${q.options.D}`;
     });
 
-    basePrompt += `\n\n**RISPOSTA FINALE - TABELLA A 2 COLONNE:**
+    basePrompt += `\n\n**RISPOSTA FINALE RICHIESTA:**
 
+1. TABELLA A 3 COLONNE (SENZA STILI INLINE):
 <table class="quiz-results-table">
 <thead>
 <tr>
-<th>Domanda</th>
+<th>N°</th>
 <th>Risposta</th>
+<th>Accuratezza</th>
 </tr>
 </thead>
 <tbody>`;
@@ -630,12 +651,21 @@ A) ${q.options.A} B) ${q.options.B} C) ${q.options.C} D) ${q.options.D}`;
 <tr>
 <td class="question-number">${q.number}</td>
 <td class="answer-letter">[A/B/C/D]</td>
+<td class="accuracy-percentage">[XX%]</td>
 </tr>`;
     });
     
     basePrompt += `
 </tbody>
 </table>
+
+2. ANALISI DETTAGLIATA per ogni domanda con formato:
+<div class="question-analysis">
+<h4>Domanda [numero]</h4>
+<p class="question-text">[testo domanda]</p>
+<p class="answer-explanation"><strong>Risposta: [lettera]</strong> - [spiegazione]</p>
+<p class="source-info">Fonte: [riferimento]</p>
+</div>`;
 
 ANALISI CONCISA:
 Per ogni domanda, una riga di spiegazione.`;
@@ -964,25 +994,36 @@ ${imageMetadata.estimatedQuality === 'low' ? '- NOTA: Qualità bassa, possibili 
 
 ` : ''}Analizza il quiz nell'immagine.
 
-CREA UNA TABELLA HTML SINTETICA A 2 COLONNE (USA LE CLASSI CSS, NON STILI INLINE):
-- Colonna 1: Numero domanda
-- Colonna 2: SOLO la lettera della risposta (A, B, C o D)
+CREA:
 
+1. TABELLA A 3 COLONNE (USA SOLO LE CLASSI CSS, NESSUNO STILE INLINE):
 <table class="quiz-results-table">
 <thead>
 <tr>
-<th>Domanda</th>
+<th>N°</th>
 <th>Risposta</th>
+<th>Accuratezza</th>
 </tr>
 </thead>
 <tbody>
-<tr><td class="question-number">1</td><td class="answer-letter">A</td></tr>
-<tr><td class="question-number">2</td><td class="answer-letter">B</td></tr>
+<tr>
+<td class="question-number">1</td>
+<td class="answer-letter">B</td>
+<td class="accuracy-percentage">85%</td>
+</tr>
 <!-- continua per tutte le domande -->
 </tbody>
 </table>
 
-Dopo la tabella, aggiungi una breve spiegazione per ogni risposta.`;
+2. ANALISI DETTAGLIATA (usa classi CSS, no stili inline):
+<div class="question-analysis">
+<h4>Domanda 1</h4>
+<p class="question-text">[Trascrivi testo completo domanda]</p>
+<p class="answer-explanation"><strong>Risposta: B</strong> - [Spiega perché]</p>
+<p class="source-info">Fonte: Pagina X del documento / Conoscenza generale</p>
+</div>
+
+Ripeti per ogni domanda.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1040,23 +1081,36 @@ ${imageMetadata.estimatedQuality === 'low' ? '- ATTENZIONE: Immagine a bassa qua
 
 ` : ''}IMPORTANTE: Non ho accesso al documento di riferimento, userò la conoscenza generale.
 
-CREA UNA TABELLA HTML SINTETICA A 2 COLONNE (USA LE CLASSI CSS, NON STILI INLINE):
+GENERA:
 
+1. TABELLA A 3 COLONNE (USA SOLO CLASSI CSS, NO STILI INLINE):
 <table class="quiz-results-table">
 <thead>
 <tr>
-<th>Domanda</th>
+<th>N°</th>
 <th>Risposta</th>
+<th>Accuratezza</th>
 </tr>
 </thead>
 <tbody>
-<tr><td class="question-number">1</td><td class="answer-letter">[A/B/C/D]</td></tr>
-<tr><td class="question-number">2</td><td class="answer-letter">[A/B/C/D]</td></tr>
+<tr>
+<td class="question-number">1</td>
+<td class="answer-letter">[A/B/C/D]</td>
+<td class="accuracy-percentage">[XX%]</td>
+</tr>
 <!-- continua per tutte le domande -->
 </tbody>
 </table>
 
-Dopo la tabella, aggiungi una breve analisi per ogni risposta.`;
+2. ANALISI DETTAGLIATA:
+<div class="question-analysis">
+<h4>Domanda [numero]</h4>
+<p class="question-text">[trascrivi domanda completa]</p>
+<p class="answer-explanation"><strong>Risposta: [lettera]</strong> - [spiegazione]</p>
+<p class="source-info">Fonte: Conoscenza generale (documento non disponibile)</p>
+</div>
+
+Nota: le percentuali saranno basse (40-60%) senza documento di riferimento.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
