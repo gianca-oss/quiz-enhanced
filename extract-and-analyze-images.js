@@ -7,7 +7,7 @@ const sharp = require('sharp'); // Per processare immagini
 const Anthropic = require('@anthropic-ai/sdk');
 
 // Configurazione
-const INPUT_PDF = './source/corso_completo.pdf';
+const INPUT_PDF = './data/source/corso_completo.pdf';
 const OUTPUT_DIR = './data/images';
 const DESCRIPTIONS_FILE = './data/image-descriptions.json';
 
