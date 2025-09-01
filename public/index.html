@@ -22,10 +22,17 @@
             -moz-osx-font-smoothing: grayscale;
         }
         
+        /* Ottimizzazione container principale per mobile */
         .container {
             max-width: 980px;
             margin: 0 auto;
-            padding: 0 22px;
+            padding: 0 16px; /* Ridotto da 22px per più spazio */
+        }
+        
+        @media (max-width: 430px) {
+            .container {
+                padding: 0 12px; /* Ancora meno padding su mobile */
+            }
         }
         
         .header {
@@ -248,11 +255,18 @@
             word-wrap: break-word;
         }
         
-        /* Stile migliorato per le tabelle nei risultati */
+        /* Stile migliorato per le tabelle nei risultati - Responsive */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 24px 0;
+        }
+        
         .result-content table {
             width: 100%;
-            max-width: 400px;
-            margin: 24px auto;
+            max-width: 350px;
+            margin: 0 auto;
             border-collapse: separate;
             border-spacing: 0;
             font-size: 16px;
@@ -265,25 +279,28 @@
         
         .result-content th {
             background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
-            padding: 14px 16px;
+            padding: 12px 12px;
             border-bottom: 2px solid #d2d2d7;
             text-align: center;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
             color: #1d1d1f;
             letter-spacing: 0.02em;
+            white-space: nowrap;
         }
         
         .result-content th:first-child {
-            width: 40%;
+            width: 35%;
+            padding-left: 16px;
         }
         
         .result-content th:nth-child(2) {
-            width: 60%;
+            width: 65%;
+            padding-right: 16px;
         }
         
         .result-content td {
-            padding: 12px 16px;
+            padding: 10px 12px;
             border-bottom: 1px solid #f0f0f2;
             text-align: center;
             transition: background 0.2s ease;
@@ -301,18 +318,58 @@
         .result-content tbody td:first-child {
             font-weight: 500;
             color: #86868b;
-            font-size: 14px;
+            font-size: 13px;
+            padding-left: 16px;
         }
         
         /* Stile per la risposta (seconda colonna) */
         .result-content tbody td:nth-child(2) {
             font-weight: 700;
-            font-size: 22px;
+            font-size: 20px;
             color: #000;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
             font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            padding-right: 16px;
+        }
+        
+        /* Ottimizzazioni specifiche per mobile */
+        @media (max-width: 430px) { /* iPhone 15 Pro e simili */
+            .result-content table {
+                max-width: calc(100vw - 44px);
+                font-size: 15px;
+            }
+            
+            .result-content th {
+                padding: 10px 8px;
+                font-size: 12px;
+            }
+            
+            .result-content td {
+                padding: 8px;
+            }
+            
+            .result-content tbody td:first-child {
+                font-size: 12px;
+                padding-left: 12px;
+            }
+            
+            .result-content tbody td:nth-child(2) {
+                font-size: 18px;
+                padding-right: 12px;
+            }
+        }
+        
+        @media (max-width: 375px) { /* iPhone SE e dispositivi più piccoli */
+            .result-content table {
+                max-width: calc(100vw - 40px);
+            }
+            
+            .result-content tbody td:nth-child(2) {
+                font-size: 16px;
+            }
         }
         
         /* Riepilogo risposte rapide */
@@ -336,20 +393,29 @@
             opacity: 0.95;
         }
         
-        /* Griglia risposte veloci */
+        /* Griglia risposte veloci - Responsive */
         .quick-answers-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 12px;
-            margin: 24px 0;
-            padding: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+            padding: 16px;
             background: #f5f5f7;
             border-radius: 12px;
         }
         
+        @media (max-width: 430px) {
+            .quick-answers-grid {
+                grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+                gap: 8px;
+                padding: 12px;
+                margin: 16px 0;
+            }
+        }
+        
         .quick-answer-item {
             text-align: center;
-            padding: 12px;
+            padding: 10px 8px;
             background: white;
             border-radius: 8px;
             border: 1px solid #d2d2d7;
@@ -362,19 +428,34 @@
         }
         
         .quick-answer-item .question-num {
-            font-size: 12px;
+            font-size: 11px;
             color: #86868b;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             font-weight: 500;
         }
         
         .quick-answer-item .answer-letter {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
             font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        }
+        
+        @media (max-width: 430px) {
+            .quick-answer-item {
+                padding: 8px 6px;
+            }
+            
+            .quick-answer-item .question-num {
+                font-size: 10px;
+            }
+            
+            .quick-answer-item .answer-letter {
+                font-size: 18px;
+            }
         }
         
         .error-message {
