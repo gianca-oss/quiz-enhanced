@@ -548,9 +548,10 @@ DOMANDE DA ANALIZZARE:`;
 A) ${q.options.A || 'N/A'} B) ${q.options.B || 'N/A'} C) ${q.options.C || 'N/A'} D) ${q.options.D || 'N/A'}`;
     });
 
-    basePrompt += `\n\n**OUTPUT RICHIESTO:**
+    basePrompt += `\n\n**OUTPUT RICHIESTO (IMPORTANTE: SEGUI ESATTAMENTE QUESTO FORMATO):**
 
-1. TABELLA RISULTATI (3 colonne, SENZA STILI INLINE):
+GENERA QUESTO HTML ESATTO:
+
 <table class="quiz-results-table">
 <thead>
 <tr>
@@ -565,8 +566,8 @@ A) ${q.options.A || 'N/A'} B) ${q.options.B || 'N/A'} C) ${q.options.C || 'N/A'}
         basePrompt += `
 <tr>
 <td class="question-number">${q.number}</td>
-<td class="answer-letter">[A/B/C/D]</td>
-<td class="accuracy-percentage">[XX%]</td>
+<td class="answer-letter">[INSERISCI SOLO A, B, C o D]</td>
+<td class="accuracy-percentage">[INSERISCI NUMERO]%</td>
 </tr>`;
     });
     
@@ -574,23 +575,27 @@ A) ${q.options.A || 'N/A'} B) ${q.options.B || 'N/A'} C) ${q.options.C || 'N/A'}
 </tbody>
 </table>
 
-2. ANALISI DETTAGLIATA:
-Per ogni domanda, fornisci:
+DOPO LA TABELLA, per ogni domanda aggiungi:
 
 <div class="question-analysis">
 <h4>Domanda ${questions[0]?.number || '1'}</h4>
 <p class="question-text">[Trascrivi il testo completo della domanda]</p>
-<p class="answer-explanation"><strong>Risposta: [LETTERA]</strong> - [Spiegazione del perché questa è la risposta corretta]</p>
-<p class="source-info">Fonte: [Pagina X del documento / Conoscenza generale]</p>
+<p class="answer-explanation"><strong>Risposta: [LETTERA]</strong> - [Spiegazione breve]</p>
+<p class="source-info">Fonte: [Pagina X del documento O Conoscenza generale]</p>
 </div>
 
-Ripeti per ogni domanda.
-
 IMPORTANTE:
-- Nella tabella: SOLO numeri, lettere e percentuali
-- Percentuali realistiche: 95-100% se trovato nel documento, 60-80% se dedotto, 40-60% se incerto
-- Nell'analisi: spiega chiaramente il ragionamento
-- Indica SEMPRE la fonte (documento con pagina o conoscenza generale)
+- Inserisci SOLO lettere A, B, C o D nella colonna risposta
+- Usa percentuali realistiche (90-100% se sicuro, 60-80% se probabile, 40-60% se incerto)
+- NON aggiungere stili CSS inline
+- Mantieni ESATTAMENTE la struttura HTML indicata`;
+
+    if (imageMetadata && imageMetadata.estimatedQuality === 'low') {
+        basePrompt += '\n\nNOTA: Immagine a bassa qualità, possibili errori di lettura.';
+    }
+
+    return basePrompt;
+}
 
 DOPO LA TABELLA:
 Aggiungi una breve analisi (MAX 2 righe per domanda) con il ragionamento chiave.
@@ -992,11 +997,9 @@ ${imageMetadata ? `METADATI IMMAGINE:
 - Qualità: ${imageMetadata.estimatedQuality} (${imageMetadata.sizeKB}KB)
 ${imageMetadata.estimatedQuality === 'low' ? '- NOTA: Qualità bassa, possibili difficoltà di lettura' : ''}
 
-` : ''}Analizza il quiz nell'immagine.
+` : ''}Analizza il quiz nell'immagine e fornisci:
 
-CREA:
-
-1. TABELLA A 3 COLONNE (USA SOLO LE CLASSI CSS, NESSUNO STILE INLINE):
+1. Una tabella HTML con ESATTAMENTE questa struttura:
 <table class="quiz-results-table">
 <thead>
 <tr>
@@ -1011,19 +1014,19 @@ CREA:
 <td class="answer-letter">B</td>
 <td class="accuracy-percentage">85%</td>
 </tr>
-<!-- continua per tutte le domande -->
+<!-- continua per ogni domanda -->
 </tbody>
 </table>
 
-2. ANALISI DETTAGLIATA (usa classi CSS, no stili inline):
+2. Per ogni domanda, aggiungi sotto la tabella:
 <div class="question-analysis">
 <h4>Domanda 1</h4>
-<p class="question-text">[Trascrivi testo completo domanda]</p>
-<p class="answer-explanation"><strong>Risposta: B</strong> - [Spiega perché]</p>
-<p class="source-info">Fonte: Pagina X del documento / Conoscenza generale</p>
+<p class="question-text">[testo domanda]</p>
+<p class="answer-explanation"><strong>Risposta: B</strong> - [spiegazione]</p>
+<p class="source-info">Fonte: [riferimento]</p>
 </div>
 
-Ripeti per ogni domanda.`;
+IMPORTANTE: USA SOLO LE CLASSI CSS INDICATE, NESSUNO STILE INLINE.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1046,6 +1049,7 @@ Ripeti per ogni domanda.`;
         const data_response = await response.json();
         
         if (!response.ok) {
+            console.error('Errore API in directAnalysisWithDoc:', data_response);
             throw new Error(data_response.error?.message || 'Errore API');
         }
 
@@ -1062,55 +1066,28 @@ Ripeti per ogni domanda.`;
         });
         
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Errore in directAnalysisWithDoc:', error);
+        // Prova fallback ancora più semplice
+        return simpleDirectAnalysis(req, res, apiKey, imageContent, imageMetadata, strategy);
     }
 }
 
 /**
- * Analisi diretta senza documento - tabella semplificata
+ * Analisi semplice di fallback
  */
-async function directAnalysisWithoutDoc(req, res, apiKey, imageContent, imageMetadata, strategy) {
-    console.log('📋 Analisi diretta senza documento');
+async function simpleDirectAnalysis(req, res, apiKey, imageContent, imageMetadata, strategy) {
+    console.log('📋 Uso analisi semplice di fallback');
     
     try {
         let prompt = `Analizza il quiz nell'immagine.
 
-${imageMetadata ? `METADATI IMMAGINE:
-- Qualità stimata: ${imageMetadata.estimatedQuality} (${imageMetadata.sizeKB}KB)
-${imageMetadata.estimatedQuality === 'low' ? '- ATTENZIONE: Immagine a bassa qualità' : ''}
+Per ogni domanda che vedi, fornisci:
+1. Il numero della domanda
+2. La lettera della risposta corretta (A, B, C o D)
+3. Una percentuale di accuratezza
+4. Una breve spiegazione
 
-` : ''}IMPORTANTE: Non ho accesso al documento di riferimento, userò la conoscenza generale.
-
-GENERA:
-
-1. TABELLA A 3 COLONNE (USA SOLO CLASSI CSS, NO STILI INLINE):
-<table class="quiz-results-table">
-<thead>
-<tr>
-<th>N°</th>
-<th>Risposta</th>
-<th>Accuratezza</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="question-number">1</td>
-<td class="answer-letter">[A/B/C/D]</td>
-<td class="accuracy-percentage">[XX%]</td>
-</tr>
-<!-- continua per tutte le domande -->
-</tbody>
-</table>
-
-2. ANALISI DETTAGLIATA:
-<div class="question-analysis">
-<h4>Domanda [numero]</h4>
-<p class="question-text">[trascrivi domanda completa]</p>
-<p class="answer-explanation"><strong>Risposta: [lettera]</strong> - [spiegazione]</p>
-<p class="source-info">Fonte: Conoscenza generale (documento non disponibile)</p>
-</div>
-
-Nota: le percentuali saranno basse (40-60%) senza documento di riferimento.`;
+Formatta la risposta come una semplice tabella HTML e poi aggiungi le spiegazioni.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1120,8 +1097,8 @@ Nota: le percentuali saranno basse (40-60%) senza documento di riferimento.`;
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: strategy.analysisModel,
-                max_tokens: strategy.analysisMaxTokens,
+                model: 'claude-3-haiku-20240307',
+                max_tokens: 3000,
                 temperature: 0.1,
                 messages: [{
                     role: 'user',
@@ -1133,21 +1110,28 @@ Nota: le percentuali saranno basse (40-60%) senza documento di riferimento.`;
         const data = await response.json();
         
         if (!response.ok) {
+            console.error('Errore anche nel fallback:', data);
             throw new Error(data.error?.message || 'Errore API');
         }
 
         res.status(200).json({
             content: data.content,
             metadata: {
-                processingMethod: 'direct-no-document-simplified',
-                analysisModel: strategy.analysisModel,
+                processingMethod: 'simple-fallback',
+                analysisModel: 'claude-3-haiku-20240307',
                 documentUsed: false,
-                imageMetadata,
-                warning: `Analisi basata solo su conoscenza generale${imageMetadata && imageMetadata.estimatedQuality === 'low' ? ' con immagine a bassa qualità' : ''}`
+                warning: 'Analisi semplificata senza documento'
             }
         });
         
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Errore critico:', error);
+        res.status(500).json({ 
+            error: 'Errore nell\'analisi del quiz. Verifica che l\'immagine sia leggibile.',
+            details: error.message 
+        });
     }
 }
+
+// Esporta la funzione alla fine del file prima di export default
+module.exports.simpleDirectAnalysis = simpleDirectAnalysis;
