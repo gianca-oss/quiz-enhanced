@@ -221,56 +221,33 @@ export default async function handler(req, res) {
         // Carica documenti
         const data = await loadProcessedData();
         
-        // STEP 1: Estrai domande dall'immagine
+        // STEP 1: Estrai domande dall'immagine con formato semplice
         console.log('📤 Estrazione domande...');
         
-        const extractPrompt = `Analizza questa immagine di quiz ed estrai TUTTE le domande.
+        const extractPrompt = `Analizza l'immagine del quiz ed estrai TUTTE le domande.
 
-REGOLE CRITICHE PER IL JSON:
-1. Sostituisci TUTTI i caratteri " (virgolette) nel testo con ' (apostrofo singolo)
-2. Sostituisci TUTTI i caratteri : (due punti) nel testo con - (trattino)
-3. Rimuovi TUTTI i caratteri \\ (backslash)
-4. Rimuovi TUTTE le interruzioni di riga nel testo (metti tutto su una riga)
-5. Se il testo è troppo lungo, troncalo a 200 caratteri
+Per ogni domanda, scrivi ESATTAMENTE in questo formato:
 
-FORMATO JSON RICHIESTO (DEVE essere JSON valido):
-{
-  "questions": [
-    {
-      "number": 1,
-      "text": "testo della domanda senza virgolette o caratteri speciali",
-      "options": {
-        "A": "testo opzione A",
-        "B": "testo opzione B",
-        "C": "testo opzione C",
-        "D": "testo opzione D"
-      }
-    }
-  ]
-}
+DOMANDA_1
+TESTO: [scrivi il testo della domanda]
+OPZIONE_A: [testo opzione A]
+OPZIONE_B: [testo opzione B]
+OPZIONE_C: [testo opzione C]
+OPZIONE_D: [testo opzione D]
+---
+DOMANDA_2
+TESTO: [scrivi il testo della domanda]
+OPZIONE_A: [testo opzione A]
+OPZIONE_B: [testo opzione B]
+OPZIONE_C: [testo opzione C]
+OPZIONE_D: [testo opzione D]
+---
 
-ESEMPIO CORRETTO:
-{
-  "questions": [
-    {
-      "number": 1,
-      "text": "Nella matrice di Kraljic gli acquisti strategici sono caratterizzati",
-      "options": {
-        "A": "Da Lungo Lead Time e Alta Importanza",
-        "B": "Da Alta Importanza e Alta Reperibilita",
-        "C": "Da Alta Importanza e Bassa Reperibilita",
-        "D": "Da Alta Volatilita e Lungo Lead Time"
-      }
-    }
-  ]
-}
-
-IMPORTANTE: 
-- Restituisci SOLO il JSON, niente altro testo prima o dopo
-- Assicurati che OGNI virgoletta sia chiusa correttamente
-- Assicurati che OGNI parentesi graffa sia chiusa
-- NON usare virgolette doppie " dentro i testi, usa sempre apostrofi singoli '
-- Se ci sono più domande, separale con virgole nel JSON array`;
+IMPORTANTE:
+- Usa ESATTAMENTE questo formato
+- Separa ogni domanda con tre trattini ---
+- NON usare virgolette o caratteri speciali
+- Scrivi tutto il testo in modo semplice`;
 
         const extractResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -282,7 +259,7 @@ IMPORTANTE:
             body: JSON.stringify({
                 model: 'claude-3-haiku-20240307',
                 max_tokens: 3000,
-                temperature: 0,  // Zero temperatura per output più preciso
+                temperature: 0,
                 messages: [{
                     role: 'user',
                     content: [imageContent, { type: 'text', text: extractPrompt }]
@@ -296,69 +273,90 @@ IMPORTANTE:
 
         const extractData = await extractResponse.json();
         
-        // Parse domande con gestione errori robusta
+        // Parse domande dal formato semplice
         let questions = [];
         try {
-            let jsonText = extractData.content[0].text;
-            console.log('Risposta raw (primi 500 caratteri):', jsonText.substring(0, 500));
+            const responseText = extractData.content[0].text;
+            console.log('Risposta estrazione (primi 500 caratteri):', responseText.substring(0, 500));
             
-            // Pulisci il JSON in modo aggressivo
-            jsonText = jsonText
-                .replace(/```json\n?/g, '')
-                .replace(/```\n?/g, '')
-                .trim();
+            // Dividi per domande
+            const questionBlocks = responseText.split('---').filter(block => block.trim());
             
-            // Trova l'inizio e la fine del JSON
-            const jsonStart = jsonText.indexOf('{');
-            const jsonEnd = jsonText.lastIndexOf('}');
-            if (jsonStart >= 0 && jsonEnd > jsonStart) {
-                jsonText = jsonText.substring(jsonStart, jsonEnd + 1);
-            }
+            questions = questionBlocks.map((block, index) => {
+                const lines = block.trim().split('\n');
+                const question = {
+                    number: index + 1,
+                    text: '',
+                    options: {}
+                };
+                
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.startsWith('TESTO:')) {
+                        question.text = line.substring(6).trim();
+                    } else if (line.startsWith('OPZIONE_A:')) {
+                        question.options.A = line.substring(10).trim();
+                    } else if (line.startsWith('OPZIONE_B:')) {
+                        question.options.B = line.substring(10).trim();
+                    } else if (line.startsWith('OPZIONE_C:')) {
+                        question.options.C = line.substring(10).trim();
+                    } else if (line.startsWith('OPZIONE_D:')) {
+                        question.options.D = line.substring(10).trim();
+                    }
+                });
+                
+                return question;
+            }).filter(q => q.text && Object.keys(q.options).length >= 2);
             
-            // Ulteriore sanitizzazione per problemi comuni
-            // Sostituisci virgolette smart con virgolette normali
-            jsonText = jsonText
-                .replace(/[""]/g, '"')  // Virgolette curve
-                .replace(/['']/g, "'")  // Apostrofi curvi
-                .replace(/\\n/g, ' ')   // Newline escaped
-                .replace(/\n/g, ' ')    // Newline reali dentro stringhe
-                .replace(/\t/g, ' ');   // Tab
+            console.log(`✅ Estratte ${questions.length} domande con parsing semplice`);
             
-            // Prova a parsare
-            const parsed = JSON.parse(jsonText);
-            questions = parsed.questions || [];
-            
-            // Validazione base
-            questions = questions.filter(q => 
-                q && q.number && q.text && q.options &&
-                typeof q.options === 'object'
-            );
-            
-            console.log(`✅ Estratte ${questions.length} domande valide`);
-            
-            // Log delle domande estratte per debug
+            // Log delle domande estratte
             questions.forEach(q => {
-                console.log(`  Q${q.number}: ${q.text.substring(0, 50)}...`);
+                console.log(`  Q${q.number}: ${q.text.substring(0, 60)}...`);
             });
             
         } catch (parseError) {
-            console.error('❌ ERRORE CRITICO nel parsing JSON:', parseError.message);
-            console.error('Posizione errore:', parseError.message.match(/position (\d+)/)?.[1]);
-            
-            // Log del JSON per debug
-            const errorPos = parseInt(parseError.message.match(/position (\d+)/)?.[1] || 0);
-            if (errorPos > 0) {
-                const start = Math.max(0, errorPos - 100);
-                const end = Math.min(jsonText.length, errorPos + 100);
-                console.error('Contesto errore:', jsonText.substring(start, end));
-            }
-            
-            throw new Error('Impossibile estrarre le domande dal quiz. Riprova con un\'immagine più chiara.');
+            console.error('❌ Errore nel parsing:', parseError.message);
+            questions = [];
         }
         
-        // Verifica che abbiamo domande
+        // Se non abbiamo domande, proviamo comunque con il documento
         if (questions.length === 0) {
-            throw new Error('Nessuna domanda estratta dal quiz. Verifica che l\'immagine sia chiara e contenga domande.');
+            console.log('⚠️ Nessuna domanda estratta, procedo con analisi diretta ma con chunks mirati');
+            
+            // Usa l'immagine per fare una ricerca generica nel documento
+            const genericSearchPrompt = `Guarda l'immagine del quiz e identifica l'argomento principale (es: supply chain, marketing, finanza, etc.)`;
+            
+            const topicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-haiku-20240307',
+                    max_tokens: 100,
+                    temperature: 0,
+                    messages: [{
+                        role: 'user',
+                        content: [imageContent, { type: 'text', text: genericSearchPrompt }]
+                    }]
+                })
+            });
+            
+            if (topicResponse.ok) {
+                const topicData = await topicResponse.json();
+                const topic = topicData.content[0].text.toLowerCase();
+                console.log('📚 Argomento identificato:', topic);
+                
+                // Crea domande fittizie basate sul topic per la ricerca
+                questions = [{
+                    number: 1,
+                    text: topic,
+                    options: {}
+                }];
+            }
         }
 
         // STEP 2: Cerca nel documento se disponibile
