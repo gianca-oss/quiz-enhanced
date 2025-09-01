@@ -696,6 +696,8 @@ export default async function handler(req, res) {
         console.log('🔧 Test di connessione ricevuto');
         
         const apiKey = process.env.ANTHROPIC_API_KEY;
+        const hasApiKey = !!apiKey;
+        const keyPreview = hasApiKey ? `${apiKey.substring(0, 10)}...` : 'NON CONFIGURATA';
         
         return res.status(200).json({
             status: 'ok',
@@ -703,7 +705,8 @@ export default async function handler(req, res) {
             timestamp: new Date().toISOString(),
             version: '2.0-hybrid-haiku',
             features: {
-                anthropicApiKey: !!apiKey,
+                anthropicApiKey: hasApiKey,
+                apiKeyPreview: keyPreview,
                 documentProcessing: true,
                 imageAnalysis: true,
                 dualStageAnalysis: true,
@@ -712,6 +715,10 @@ export default async function handler(req, res) {
             endpoints: {
                 analyze: 'POST /api/analyze-smart',
                 test: 'GET /api/analyze-smart'
+            },
+            debug: {
+                nodeVersion: process.version,
+                platform: process.platform
             }
         });
     }
@@ -801,18 +808,40 @@ export default async function handler(req, res) {
         let questions;
         try {
             let jsonText = extractData.content[0].text;
+            console.log('Risposta raw dall\'estrazione (primi 200 caratteri):', jsonText.substring(0, 200));
+            
+            // Rimuovi eventuali markdown code blocks
             jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            
+            // Cerca di trovare l'inizio del JSON
+            const jsonStart = jsonText.indexOf('{');
+            if (jsonStart > 0) {
+                jsonText = jsonText.substring(jsonStart);
+            }
+            
+            // Cerca di trovare la fine del JSON
+            const jsonEnd = jsonText.lastIndexOf('}');
+            if (jsonEnd > 0 && jsonEnd < jsonText.length - 1) {
+                jsonText = jsonText.substring(0, jsonEnd + 1);
+            }
+            
+            console.log('JSON pulito (primi 200 caratteri):', jsonText.substring(0, 200));
             
             if (jsonText.startsWith('{') && jsonText.includes('questions')) {
                 const parsed = JSON.parse(jsonText);
                 questions = parsed.questions;
                 
-                // Validazione domande
+                // Validazione domande - rimuovo il requisito delle keywords che potrebbe causare problemi
                 questions = questions.filter(q => 
                     q.number && q.text && q.options && 
-                    Object.keys(q.options).length >= 2 && 
-                    q.keywords && q.keywords.length > 0
+                    Object.keys(q.options).length >= 2
                 );
+                
+                // Aggiungi keywords vuote se mancano
+                questions = questions.map(q => ({
+                    ...q,
+                    keywords: q.keywords || []
+                }));
                 
                 console.log(`✅ Estratte ${questions.length} domande valide`);
                 
@@ -820,10 +849,11 @@ export default async function handler(req, res) {
                     throw new Error('Nessuna domanda valida estratta');
                 }
             } else {
-                throw new Error('Formato non JSON valido');
+                throw new Error('Formato non JSON valido o mancante campo questions');
             }
         } catch (e) {
-            console.error('⚠️ Parsing fallito, uso analisi diretta:', e.message);
+            console.error('⚠️ Parsing fallito:', e.message);
+            console.error('Risposta completa:', extractData.content[0].text);
             return directAnalysisWithDoc(req, res, apiKey, imageContent, data, imageMetadata, strategy);
         }
 
