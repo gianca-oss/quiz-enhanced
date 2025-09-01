@@ -256,182 +256,246 @@
             word-wrap: break-word;
         }
         
-        /* ===== STILI CENTRALIZZATI PER TABELLE QUIZ ===== */
+        /* ===== STILI CENTRALIZZATI PER TABELLE QUIZ - STILE APPLE ===== */
         
-        /* Contenitore tabella */
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin: 24px 0;
-        }
-        
-        /* Tabella principale dei risultati quiz */
+        /* Tabella principale dei risultati quiz - 3 colonne */
         .quiz-results-table {
             width: 100%;
-            max-width: 298px;
-            margin: 0 auto;
-            border-collapse: separate;
-            border-spacing: 0;
+            max-width: 400px;
+            margin: 20px auto;
+            border-collapse: collapse;
             font-size: 14px;
             background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #d2d2d7;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         
-        /* Header tabella */
+        /* Header tabella - stile Apple minimale */
+        .quiz-results-table thead {
+            background: #f5f5f7;
+            border-bottom: 1px solid #d2d2d7;
+        }
+        
         .quiz-results-table th {
-            background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
-            padding: 10px 10px;
-            border-bottom: 2px solid #d2d2d7;
+            padding: 12px;
             text-align: center;
             font-weight: 600;
             font-size: 11px;
-            color: #1d1d1f;
-            letter-spacing: 0.02em;
-            white-space: nowrap;
+            color: #86868b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .quiz-results-table th:first-child {
-            width: 35%;
-            padding-left: 14px;
+            width: 15%;
+            text-align: center;
         }
         
         .quiz-results-table th:nth-child(2) {
-            width: 65%;
-            padding-right: 14px;
+            width: 35%;
         }
         
-        /* Celle tabella */
-        .quiz-results-table td {
-            padding: 8px 10px;
+        .quiz-results-table th:nth-child(3) {
+            width: 50%;
+        }
+        
+        /* Righe tabella */
+        .quiz-results-table tbody tr {
             border-bottom: 1px solid #f0f0f2;
-            text-align: center;
-            transition: background 0.2s ease;
         }
         
-        .quiz-results-table tbody tr:last-child td {
+        .quiz-results-table tbody tr:last-child {
             border-bottom: none;
         }
         
         .quiz-results-table tbody tr:hover {
-            background: #fbfbfd;
+            background: #fafafa;
+        }
+        
+        /* Celle tabella */
+        .quiz-results-table td {
+            padding: 12px;
+            text-align: center;
         }
         
         /* Colonna numero domanda */
         .question-number {
             font-weight: 500;
             color: #86868b;
-            font-size: 11px;
-            padding-left: 14px !important;
+            font-size: 13px;
         }
         
         /* Colonna lettera risposta */
         .answer-letter {
             font-weight: 700;
-            font-size: 17px;
-            color: #000;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 18px;
+            color: #1d1d1f;
             font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-            padding-right: 14px !important;
+        }
+        
+        /* Colonna accuratezza */
+        .accuracy-percentage {
+            font-weight: 500;
+            font-size: 13px;
+            color: #86868b;
+        }
+        
+        /* Colori per diversi livelli di accuratezza */
+        .accuracy-percentage:contains("9") { /* 90-100% */
+            color: #34c759;
+            font-weight: 600;
+        }
+        
+        .accuracy-percentage:contains("8") { /* 80-89% */
+            color: #30d158;
+        }
+        
+        .accuracy-percentage:contains("7") { /* 70-79% */
+            color: #ff9500;
+        }
+        
+        .accuracy-percentage:contains("6") { /* 60-69% */
+            color: #ff9500;
+        }
+        
+        /* Sotto 60% */
+        td.accuracy-percentage {
+            color: #ff3b30;
+        }
+        
+        /* Stili per analisi dettagliata */
+        .question-analysis {
+            margin: 24px 0;
+            padding: 20px;
+            background: #fbfbfd;
+            border-radius: 10px;
+            border: 1px solid #f0f0f2;
+        }
+        
+        .question-analysis h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 12px;
+        }
+        
+        .question-text {
+            font-size: 14px;
+            color: #515154;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #007aff;
+        }
+        
+        .answer-explanation {
+            font-size: 14px;
+            color: #1d1d1f;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+        
+        .answer-explanation strong {
+            color: #007aff;
+            font-weight: 600;
+        }
+        
+        .source-info {
+            font-size: 12px;
+            color: #86868b;
+            font-style: italic;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #f0f0f2;
         }
         
         /* Retrocompatibilità per tabelle senza classi (fallback) */
         .result-content table:not(.quiz-results-table) {
             width: 100%;
-            max-width: 350px;
-            margin: 0 auto;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 16px;
+            max-width: 400px;
+            margin: 20px auto;
+            border-collapse: collapse;
+            font-size: 14px;
             background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #d2d2d7;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         
         .result-content table:not(.quiz-results-table) th {
-            background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
-            padding: 12px 12px;
-            border-bottom: 2px solid #d2d2d7;
+            background: #f5f5f7;
+            padding: 12px;
             text-align: center;
             font-weight: 600;
-            font-size: 13px;
-            color: #1d1d1f;
-            letter-spacing: 0.02em;
+            font-size: 11px;
+            color: #86868b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .result-content table:not(.quiz-results-table) td {
-            padding: 10px 12px;
+            padding: 12px;
             border-bottom: 1px solid #f0f0f2;
             text-align: center;
-        }
-        
-        .result-content table:not(.quiz-results-table) tbody td:first-child {
-            font-weight: 500;
-            color: #86868b;
-            font-size: 13px;
-        }
-        
-        .result-content table:not(.quiz-results-table) tbody td:nth-child(2) {
-            font-weight: 700;
-            font-size: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
         }
         
         /* Media queries per dispositivi mobili */
         @media (max-width: 430px) { /* iPhone 15 Pro e simili */
             .quiz-results-table {
-                max-width: calc(100vw - 37px);
+                max-width: calc(100vw - 32px);
                 font-size: 13px;
             }
             
             .quiz-results-table th {
-                padding: 8px 7px;
+                padding: 10px 6px;
                 font-size: 10px;
             }
             
             .quiz-results-table td {
-                padding: 7px;
+                padding: 10px 6px;
             }
             
             .question-number {
-                font-size: 10px;
-                padding-left: 10px !important;
+                font-size: 12px;
             }
             
             .answer-letter {
-                font-size: 15px;
-                padding-right: 10px !important;
+                font-size: 16px;
             }
             
-            /* Fallback responsive */
-            .result-content table:not(.quiz-results-table) {
-                max-width: calc(100vw - 37px);
+            .accuracy-percentage {
+                font-size: 12px;
+            }
+            
+            .question-analysis {
+                padding: 16px;
+                margin: 20px 0;
+            }
+            
+            .question-analysis h4 {
+                font-size: 15px;
+            }
+            
+            .question-text,
+            .answer-explanation {
+                font-size: 13px;
+            }
+            
+            .source-info {
+                font-size: 11px;
             }
         }
         
         @media (max-width: 375px) { /* iPhone SE e dispositivi più piccoli */
             .quiz-results-table {
-                max-width: calc(100vw - 34px);
+                max-width: calc(100vw - 28px);
             }
             
             .answer-letter {
-                font-size: 14px;
-            }
-            
-            .result-content table:not(.quiz-results-table) {
-                max-width: calc(100vw - 34px);
+                font-size: 15px;
             }
         }
         
@@ -902,13 +966,26 @@
             
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
+                if (cells.length >= 3) {
+                    const questionNum = cells[0].textContent.trim();
+                    const answer = cells[1].textContent.trim().toUpperCase();
+                    const accuracy = cells[2].textContent.trim();
+                    if (questionNum && ['A', 'B', 'C', 'D'].includes(answer)) {
+                        answers.push({
+                            number: questionNum,
+                            answer: answer,
+                            accuracy: accuracy
+                        });
+                    }
+                } else if (cells.length >= 2) {
+                    // Fallback per tabelle a 2 colonne
                     const questionNum = cells[0].textContent.trim();
                     const answer = cells[1].textContent.trim().toUpperCase();
                     if (questionNum && ['A', 'B', 'C', 'D'].includes(answer)) {
                         answers.push({
                             number: questionNum,
-                            answer: answer
+                            answer: answer,
+                            accuracy: 'N/A'
                         });
                     }
                 }
@@ -1048,43 +1125,10 @@
                     resultHeader.className = 'result-header';
                     resultHeader.textContent = `Analisi ${i + 1} di ${images.length}`;
                     
-                    // Content con tabella sintetica
+                    // Content - mostra direttamente il risultato HTML
                     const resultContent = document.createElement('div');
                     resultContent.className = 'result-content';
-                    
-                    // Se abbiamo estratto risposte, mostra tabella sintetica
-                    if (extractedAnswers.length > 0) {
-                        // Prima il riepilogo veloce
-                        resultContent.innerHTML = createQuickSummary(extractedAnswers);
-                        
-                        // Poi la tabella sintetica
-                        resultContent.innerHTML += createSyntheticTable(extractedAnswers);
-                        
-                        // Aggiungi l'analisi dettagliata nascosta
-                        const detailedAnalysis = document.createElement('div');
-                        detailedAnalysis.className = 'detailed-analysis';
-                        detailedAnalysis.innerHTML = result;
-                        
-                        // Bottone per mostrare/nascondere dettagli
-                        const toggleBtn = document.createElement('button');
-                        toggleBtn.className = 'show-details-btn';
-                        toggleBtn.textContent = 'Mostra analisi dettagliata';
-                        toggleBtn.onclick = function() {
-                            if (detailedAnalysis.style.display === 'block') {
-                                detailedAnalysis.style.display = 'none';
-                                toggleBtn.textContent = 'Mostra analisi dettagliata';
-                            } else {
-                                detailedAnalysis.style.display = 'block';
-                                toggleBtn.textContent = 'Nascondi analisi dettagliata';
-                            }
-                        };
-                        
-                        resultContent.appendChild(toggleBtn);
-                        resultContent.appendChild(detailedAnalysis);
-                    } else {
-                        // Se non riusciamo a estrarre, mostra risultato originale
-                        resultContent.innerHTML = result;
-                    }
+                    resultContent.innerHTML = result;
                     
                     // Costruisci il risultato
                     resultItem.appendChild(resultHeader);
