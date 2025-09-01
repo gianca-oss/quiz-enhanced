@@ -335,15 +335,16 @@ function extractAnswersFromResponse(responseText) {
         if (tableMatches) {
             tableMatches.forEach(row => {
                 const cellMatches = row.match(/>([^<]+)</g);
-                if (cellMatches && cellMatches.length >= 2) {
+                if (cellMatches && cellMatches.length >= 4) {
                     const question = cellMatches[0].replace(/[<>]/g, '').trim();
                     const answer = cellMatches[1].replace(/[<>]/g, '').trim();
+                    const confidence = cellMatches[2].replace(/[<>]/g, '').replace(/[^\d]/g, '');
                     
-                    if (question && ['A', 'B', 'C', 'D'].includes(answer)) {
+                    if (question && ['A', 'B', 'C', 'D'].includes(answer) && confidence) {
                         answers.push({
                             question: parseInt(question) || answers.length + 1,
                             answer,
-                            confidence: cellMatches[2] ? parseInt(cellMatches[2].replace(/[<>]/g, '').replace(/[^\d]/g, '')) : 0
+                            confidence: parseInt(confidence)
                         });
                     }
                 }
@@ -532,13 +533,30 @@ IMPORTANTE: Solo JSON valido, nessun testo extra.`;
 }
 
 /**
- * Genera prompt di analisi massimamente ottimizzato per Haiku con tabella semplificata
+ * Genera prompt di analisi massimamente ottimizzato per Haiku
  */
 function generateOptimizedAnalysisPrompt(globalContext, questions, imageMetadata, strategy) {
-    let basePrompt = `ANALISI QUIZ - OUTPUT SINTETICO
+    let basePrompt = `ANALISI QUIZ - HAIKU OTTIMIZZATO
 
 CONTESTO DOCUMENTO (${globalContext ? 'DISPONIBILE' : 'LIMITATO'}):
 ${globalContext || 'ATTENZIONE: Contesto ridotto - basa l\'analisi su conoscenza generale'}
+
+PROCESSO DI ANALISI RICHIESTO:
+
+STEP 1 - LETTURA SISTEMATICA:
+Per ogni domanda, applica questo processo:
+1. Leggi attentamente domanda e tutte le opzioni
+2. Identifica il concetto/argomento principale
+3. Cerca corrispondenze ESATTE nel contesto del documento
+4. Se non trovi corrispondenze dirette, cerca concetti correlati
+5. Elimina opzioni chiaramente errate basandoti su logica e contesto
+
+STEP 2 - VALUTAZIONE EVIDENZE:
+- EVIDENZA DIRETTA (95-100%): Risposta letteralmente nel documento
+- EVIDENZA FORTE (80-94%): Risposta deducibile chiaramente dal documento  
+- EVIDENZA MEDIA (60-79%): Risposta supportata parzialmente dal documento
+- EVIDENZA DEBOLE (40-59%): Risposta basata su conoscenza generale
+- INCERTEZZA ALTA (<40%): Multiple opzioni plausibili
 
 DOMANDE DA ANALIZZARE:`;
 
@@ -548,42 +566,44 @@ DOMANDE DA ANALIZZARE:`;
 A) ${q.options.A || 'N/A'} B) ${q.options.B || 'N/A'} C) ${q.options.C || 'N/A'} D) ${q.options.D || 'N/A'}`;
     });
 
-    basePrompt += `\n\n**OUTPUT RICHIESTO - TABELLA SINTETICA A 2 COLONNE:**
+    basePrompt += `\n\nOUTPUT RICHIESTO:
 
-Genera SOLO questa tabella HTML semplificata con le risposte:
-
-<table>
-<thead>
-<tr>
-<th>Domanda</th>
-<th>Risposta</th>
-</tr>
-</thead>
+1. TABELLA RISULTATI (formato HTML):
+<table style="width:100%; border-collapse:collapse; margin:16px 0;">
+<thead><tr style="background:#f5f5f7;">
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Q</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Risposta</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Accuratezza</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Fonte</th>
+</tr></thead>
 <tbody>`;
     
     questions.forEach(q => {
         basePrompt += `
 <tr>
-<td>${q.number}</td>
-<td>[SOLO LETTERA: A/B/C/D]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center;">${q.number}</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center; font-weight:600; font-size:18px;">[LETTERA]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center;">[%]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center; font-size:11px;">[DOC/GEN]</td>
 </tr>`;
     });
     
-    basePrompt += `
-</tbody>
-</table>
+    basePrompt += `</tbody></table>
 
-DOPO LA TABELLA:
-Aggiungi una breve analisi (MAX 2 righe per domanda) con il ragionamento chiave.
+2. ANALISI DETTAGLIATA CONCISA:
+Per ogni domanda (MAX 2-3 RIGHE):
+- **Q${questions[0]?.number || '1'}**: Ragionamento + riferimento pagina se disponibile
+- **Q${questions[1]?.number || '2'}**: [etc...]
 
-IMPORTANTE:
-- Nella tabella inserisci SOLO la lettera della risposta (A, B, C o D)
-- Non aggiungere colonne extra
-- Mantieni la tabella pulita e semplice
-- L'analisi dettagliata va DOPO la tabella, non dentro`;
+CRITERI QUALITÀ HAIKU:
+- Sii PRECISO sulle percentuali - non sovrastimare
+- Indica chiaramente fonte: DOC se dal documento, GEN se conoscenza generale  
+- Concentrati su ELIMINAZIONE opzioni errate piuttosto che conferma positive
+- Se incerto tra 2 opzioni, scegli quella con più supporto logico
+- ONESTÀ > ACCURATEZZA PERCEPITA`;
 
     if (imageMetadata && imageMetadata.estimatedQuality === 'low') {
-        basePrompt += '\n\nNOTA: Considera possibili errori di lettura dell\'immagine.';
+        basePrompt += '\n\nNOTA: Considera possibili errori di lettura dell\'immagine nelle tue valutazioni.';
     }
 
     return basePrompt;
@@ -593,7 +613,7 @@ IMPORTANTE:
  * Genera prompt di analisi finale con risultati preliminari
  */
 function generateFinalAnalysisPrompt(globalContext, questions, preliminaryAnalysis, imageMetadata, strategy) {
-    let basePrompt = `ANALISI FINALE QUIZ - TABELLA SINTETICA
+    let basePrompt = `ANALISI FINALE QUIZ - HAIKU DOPPIO CONTROLLO
 
 CONTESTO DOCUMENTO:
 ${globalContext || 'Contesto limitato disponibile'}
@@ -605,7 +625,7 @@ ${preliminaryAnalysis.analysis.map(a =>
 - Copertura documento: ${a.document_coverage}
 `).join('\n')}
 
-TASK: Conferma la risposta definitiva per ogni domanda.` : 'TASK: Analisi diretta delle domande.'}
+TASK FINALE: Validare e decidere la risposta definitiva per ogni domanda.` : 'TASK: Analisi diretta delle domande.'}
 
 DOMANDE:`;
 
@@ -614,31 +634,31 @@ DOMANDE:`;
 A) ${q.options.A} B) ${q.options.B} C) ${q.options.C} D) ${q.options.D}`;
     });
 
-    basePrompt += `\n\n**RISPOSTA FINALE - TABELLA A 2 COLONNE:**
+    basePrompt += `\n\nRISPOSTA FINALE RICHIESTA:
 
-<table>
-<thead>
-<tr>
-<th>Domanda</th>
-<th>Risposta</th>
-</tr>
-</thead>
+<table style="width:100%; border-collapse:collapse; margin:16px 0;">
+<thead><tr style="background:#f5f5f7;">
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Q</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Risposta</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Accuratezza</th>
+<th style="padding:10px; border:1px solid #d2d2d7; text-align:center;">Fonte</th>
+</tr></thead>
 <tbody>`;
     
     questions.forEach(q => {
         basePrompt += `
 <tr>
-<td>${q.number}</td>
-<td>[A/B/C/D]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center;">${q.number}</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center; font-weight:600; font-size:18px;">[A/B/C/D]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center;">[%]</td>
+<td style="padding:8px; border:1px solid #d2d2d7; text-align:center; font-size:11px;">[DOC/GEN]</td>
 </tr>`;
     });
     
-    basePrompt += `
-</tbody>
-</table>
+    basePrompt += `</tbody></table>
 
-ANALISI CONCISA:
-Per ogni domanda, una riga di spiegazione.`;
+ANALISI DETTAGLIATA:
+Per ogni domanda: ragionamento conciso + fonte + eventuali dubbi.`;
 
     return basePrompt;
 }
@@ -671,8 +691,7 @@ export default async function handler(req, res) {
                 anthropicApiKey: !!apiKey,
                 documentProcessing: true,
                 imageAnalysis: true,
-                dualStageAnalysis: true,
-                simplifiedOutput: true
+                dualStageAnalysis: true
             },
             endpoints: {
                 analyze: 'POST /api/analyze-smart',
@@ -840,8 +859,8 @@ export default async function handler(req, res) {
         
         console.log(`📄 Contesto costruito: ~${currentLength} token stimati`);
 
-        // STEP 4: Analisi finale ottimizzata per Haiku con tabella semplificata
-        console.log(`🎯 Analisi finale con tabella sintetica...`);
+        // STEP 4: Analisi finale ottimizzata per Haiku
+        console.log(`🎯 Analisi finale con validazione...`);
         const finalAnalysisPrompt = generateOptimizedAnalysisPrompt(globalContext, questions, imageMetadata, strategy);
         
         const analyzeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -905,7 +924,7 @@ export default async function handler(req, res) {
         res.status(200).json({
             content: analyzeData.content,
             metadata: {
-                processingMethod: 'optimized-haiku-simplified-table',
+                processingMethod: 'optimized-haiku-single-stage',
                 extractionModel: strategy.extractionModel,
                 analysisModel: strategy.analysisModel,
                 questionsAnalyzed: questions.length,
@@ -942,7 +961,7 @@ export default async function handler(req, res) {
 }
 
 /**
- * Analisi diretta con documento - tabella semplificata
+ * Analisi diretta con documento
  */
 async function directAnalysisWithDoc(req, res, apiKey, imageContent, data, imageMetadata, strategy) {
     console.log('📋 Analisi diretta con documento di supporto');
@@ -964,23 +983,11 @@ ${imageMetadata.estimatedQuality === 'low' ? '- NOTA: Qualità bassa, possibili 
 
 ` : ''}Analizza il quiz nell'immagine.
 
-CREA UNA TABELLA HTML SINTETICA A 2 COLONNE:
-- Colonna 1: Numero domanda
-- Colonna 2: SOLO la lettera della risposta (A, B, C o D)
+CREA:
+1. TABELLA HTML con: Domanda | Risposta (A/B/C/D) | Accuratezza %
+2. ANALISI DETTAGLIATA per ogni domanda
 
-<table>
-<thead>
-<tr>
-<th>Domanda</th>
-<th>Risposta</th>
-</tr>
-</thead>
-<tbody>
-[righe con numero domanda e lettera risposta]
-</tbody>
-</table>
-
-Dopo la tabella, aggiungi una breve spiegazione per ogni risposta.`;
+Usa il contesto quando rilevante, altrimenti usa la tua conoscenza.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1009,7 +1016,7 @@ Dopo la tabella, aggiungi una breve spiegazione per ogni risposta.`;
         res.status(200).json({
             content: data_response.content,
             metadata: {
-                processingMethod: 'direct-with-context-simplified',
+                processingMethod: 'direct-with-context-hybrid',
                 analysisModel: strategy.analysisModel,
                 documentUsed: true,
                 searchQuality: 'sample',
@@ -1024,7 +1031,7 @@ Dopo la tabella, aggiungi una breve spiegazione per ogni risposta.`;
 }
 
 /**
- * Analisi diretta senza documento - tabella semplificata
+ * Analisi diretta senza documento
  */
 async function directAnalysisWithoutDoc(req, res, apiKey, imageContent, imageMetadata, strategy) {
     console.log('📋 Analisi diretta senza documento');
@@ -1034,27 +1041,16 @@ async function directAnalysisWithoutDoc(req, res, apiKey, imageContent, imageMet
 
 ${imageMetadata ? `METADATI IMMAGINE:
 - Qualità stimata: ${imageMetadata.estimatedQuality} (${imageMetadata.sizeKB}KB)
-${imageMetadata.estimatedQuality === 'low' ? '- ATTENZIONE: Immagine a bassa qualità' : ''}
+- Modello utilizzato: ${strategy.analysisModel.includes('sonnet') ? 'Sonnet (alta accuratezza)' : 'Haiku (veloce)'}
+${imageMetadata.estimatedQuality === 'low' ? '- ATTENZIONE: Immagine a bassa qualità, indica quando non riesci a leggere parti del testo' : ''}
 
-` : ''}IMPORTANTE: Non ho accesso al documento di riferimento, userò la conoscenza generale.
+` : ''}IMPORTANTE: Non ho accesso al documento di riferimento, quindi userò la conoscenza generale.
 
-CREA UNA TABELLA HTML SINTETICA A 2 COLONNE:
+CREA:
+1. TABELLA HTML con colonne: Domanda | Risposta (A/B/C/D) | Accuratezza %
+2. ANALISI DETTAGLIATA per ogni domanda
 
-<table>
-<thead>
-<tr>
-<th>Domanda</th>
-<th>Risposta</th>
-</tr>
-</thead>
-<tbody>
-<tr><td>1</td><td>[A/B/C/D]</td></tr>
-<tr><td>2</td><td>[A/B/C/D]</td></tr>
-<!-- continua per tutte le domande -->
-</tbody>
-</table>
-
-Dopo la tabella, aggiungi una breve analisi per ogni risposta.`;
+NOTA: Senza documento di riferimento${imageMetadata && imageMetadata.estimatedQuality === 'low' ? ' e con immagine a bassa qualità ' : ''}, l'accuratezza sarà limitata.`;
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1083,7 +1079,7 @@ Dopo la tabella, aggiungi una breve analisi per ogni risposta.`;
         res.status(200).json({
             content: data.content,
             metadata: {
-                processingMethod: 'direct-no-document-simplified',
+                processingMethod: 'direct-no-document-hybrid',
                 analysisModel: strategy.analysisModel,
                 documentUsed: false,
                 imageMetadata,
