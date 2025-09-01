@@ -226,12 +226,19 @@ export default async function handler(req, res) {
         
         const extractPrompt = `Analizza questa immagine di quiz ed estrai TUTTE le domande.
 
-Fornisci un JSON con questo formato ESATTO:
+REGOLE CRITICHE PER IL JSON:
+1. Sostituisci TUTTI i caratteri " (virgolette) nel testo con ' (apostrofo singolo)
+2. Sostituisci TUTTI i caratteri : (due punti) nel testo con - (trattino)
+3. Rimuovi TUTTI i caratteri \\ (backslash)
+4. Rimuovi TUTTE le interruzioni di riga nel testo (metti tutto su una riga)
+5. Se il testo è troppo lungo, troncalo a 200 caratteri
+
+FORMATO JSON RICHIESTO (DEVE essere JSON valido):
 {
   "questions": [
     {
       "number": 1,
-      "text": "testo completo della domanda",
+      "text": "testo della domanda senza virgolette o caratteri speciali",
       "options": {
         "A": "testo opzione A",
         "B": "testo opzione B",
@@ -242,7 +249,28 @@ Fornisci un JSON con questo formato ESATTO:
   ]
 }
 
-IMPORTANTE: Restituisci SOLO il JSON, niente altro testo.`;
+ESEMPIO CORRETTO:
+{
+  "questions": [
+    {
+      "number": 1,
+      "text": "Nella matrice di Kraljic gli acquisti strategici sono caratterizzati",
+      "options": {
+        "A": "Da Lungo Lead Time e Alta Importanza",
+        "B": "Da Alta Importanza e Alta Reperibilita",
+        "C": "Da Alta Importanza e Bassa Reperibilita",
+        "D": "Da Alta Volatilita e Lungo Lead Time"
+      }
+    }
+  ]
+}
+
+IMPORTANTE: 
+- Restituisci SOLO il JSON, niente altro testo prima o dopo
+- Assicurati che OGNI virgoletta sia chiusa correttamente
+- Assicurati che OGNI parentesi graffa sia chiusa
+- NON usare virgolette doppie " dentro i testi, usa sempre apostrofi singoli '
+- Se ci sono più domande, separale con virgole nel JSON array`;
 
         const extractResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -253,8 +281,8 @@ IMPORTANTE: Restituisci SOLO il JSON, niente altro testo.`;
             },
             body: JSON.stringify({
                 model: 'claude-3-haiku-20240307',
-                max_tokens: 2000,
-                temperature: 0.1,
+                max_tokens: 3000,
+                temperature: 0,  // Zero temperatura per output più preciso
                 messages: [{
                     role: 'user',
                     content: [imageContent, { type: 'text', text: extractPrompt }]
@@ -274,8 +302,11 @@ IMPORTANTE: Restituisci SOLO il JSON, niente altro testo.`;
             let jsonText = extractData.content[0].text;
             console.log('Risposta raw (primi 500 caratteri):', jsonText.substring(0, 500));
             
-            // Pulisci il JSON
-            jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            // Pulisci il JSON in modo aggressivo
+            jsonText = jsonText
+                .replace(/```json\n?/g, '')
+                .replace(/```\n?/g, '')
+                .trim();
             
             // Trova l'inizio e la fine del JSON
             const jsonStart = jsonText.indexOf('{');
@@ -284,116 +315,50 @@ IMPORTANTE: Restituisci SOLO il JSON, niente altro testo.`;
                 jsonText = jsonText.substring(jsonStart, jsonEnd + 1);
             }
             
-            // Tentativo di parsing
+            // Ulteriore sanitizzazione per problemi comuni
+            // Sostituisci virgolette smart con virgolette normali
+            jsonText = jsonText
+                .replace(/[""]/g, '"')  // Virgolette curve
+                .replace(/['']/g, "'")  // Apostrofi curvi
+                .replace(/\\n/g, ' ')   // Newline escaped
+                .replace(/\n/g, ' ')    // Newline reali dentro stringhe
+                .replace(/\t/g, ' ');   // Tab
+            
+            // Prova a parsare
             const parsed = JSON.parse(jsonText);
             questions = parsed.questions || [];
-            console.log(`✅ Estratte ${questions.length} domande con parsing standard`);
+            
+            // Validazione base
+            questions = questions.filter(q => 
+                q && q.number && q.text && q.options &&
+                typeof q.options === 'object'
+            );
+            
+            console.log(`✅ Estratte ${questions.length} domande valide`);
+            
+            // Log delle domande estratte per debug
+            questions.forEach(q => {
+                console.log(`  Q${q.number}: ${q.text.substring(0, 50)}...`);
+            });
             
         } catch (parseError) {
-            console.error('⚠️ Errore parsing JSON:', parseError.message);
-            console.log('Tentativo di analisi diretta dell\'immagine...');
+            console.error('❌ ERRORE CRITICO nel parsing JSON:', parseError.message);
+            console.error('Posizione errore:', parseError.message.match(/position (\d+)/)?.[1]);
             
-            // FALLBACK: Analisi diretta senza estrazione strutturata
-            // Salta l'estrazione e vai direttamente all'analisi con l'immagine
-            
-            // Se abbiamo il documento, usa un campione di chunks
-            let contextSample = '';
-            if (data && data.chunks && data.chunks.length > 0) {
-                // Prendi un campione random di chunks
-                const sampleChunks = data.chunks
-                    .sort(() => Math.random() - 0.5)
-                    .slice(0, 30)
-                    .map(chunk => `[Pagina ${chunk.page}] ${chunk.text}`)
-                    .join('\n\n---\n\n');
-                
-                contextSample = `CONTESTO DAL DOCUMENTO (campione di 30 sezioni):
-${sampleChunks}
-
-USA QUESTO CONTESTO per rispondere con maggiore accuratezza.
-
-`;
+            // Log del JSON per debug
+            const errorPos = parseInt(parseError.message.match(/position (\d+)/)?.[1] || 0);
+            if (errorPos > 0) {
+                const start = Math.max(0, errorPos - 100);
+                const end = Math.min(jsonText.length, errorPos + 100);
+                console.error('Contesto errore:', jsonText.substring(start, end));
             }
             
-            // Analisi diretta con prompt semplificato
-            const directAnalysisPrompt = `${contextSample}Analizza l'immagine del quiz e fornisci le risposte.
-
-FORMATO RICHIESTO:
-
-1. TABELLA HTML:
-<table class="quiz-results-table">
-<thead>
-<tr>
-<th>N°</th>
-<th>Risposta</th>
-<th>Accuratezza</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="question-number">1</td>
-<td class="answer-letter">[A/B/C/D]</td>
-<td class="accuracy-percentage">[%]</td>
-</tr>
-<!-- aggiungi una riga per ogni domanda che vedi -->
-</tbody>
-</table>
-
-2. ANALISI DETTAGLIATA per ogni domanda:
-<div class="question-analysis">
-<h4>Domanda [numero]</h4>
-<p class="question-text">[trascrivi il testo della domanda]</p>
-<p class="answer-explanation"><strong>Risposta: [lettera]</strong> - [spiegazione]</p>
-<p class="source-info">Fonte: ${data ? '[Pagina X se trovata nel contesto]' : 'Conoscenza generale'}</p>
-</div>
-
-${data ? 'IMPORTANTE: Cerca di basare le risposte sul CONTESTO fornito sopra dal documento.' : ''}`;
-
-            console.log('🎯 Esecuzione analisi diretta fallback...');
-            
-            const fallbackResponse = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01'
-                },
-                body: JSON.stringify({
-                    model: 'claude-3-haiku-20240307',
-                    max_tokens: 4000,
-                    temperature: 0.1,
-                    messages: [{
-                        role: 'user',
-                        content: [imageContent, { type: 'text', text: directAnalysisPrompt }]
-                    }]
-                })
-            });
-
-            if (!fallbackResponse.ok) {
-                throw new Error('Errore anche nell\'analisi fallback');
-            }
-
-            const fallbackData = await fallbackResponse.json();
-            
-            console.log('✅ Analisi fallback completata');
-
-            return res.status(200).json({
-                content: fallbackData.content,
-                metadata: {
-                    model: 'claude-3-haiku-20240307',
-                    processingMethod: 'direct-fallback-with-sample',
-                    documentUsed: !!data,
-                    chunksAvailable: data ? data.chunks.length : 0,
-                    note: 'Analisi diretta (parsing JSON fallito)',
-                    accuracy: data ? 'medium-high' : 'medium'
-                }
-            });
+            throw new Error('Impossibile estrarre le domande dal quiz. Riprova con un\'immagine più chiara.');
         }
         
-        // Se non ci sono domande valide, usa fallback
+        // Verifica che abbiamo domande
         if (questions.length === 0) {
-            console.log('⚠️ Nessuna domanda estratta, uso analisi diretta');
-            // Usa lo stesso codice di fallback sopra
-            // (codice omesso per brevità, ma sarebbe lo stesso del catch block)
+            throw new Error('Nessuna domanda estratta dal quiz. Verifica che l\'immagine sia chiara e contenga domande.');
         }
 
         // STEP 2: Cerca nel documento se disponibile
