@@ -78,9 +78,13 @@ async function loadProcessedData() {
 /**
  * Ricerca chunks rilevanti
  */
-function searchRelevantChunks(questions, data, maxChunks = 20) {
-    if (!data || !data.chunks) return [];
+function searchRelevantChunks(questions, data, maxChunks = 30) {
+    if (!data || !data.chunks || data.chunks.length === 0) {
+        console.log('❌ Nessun chunk disponibile per la ricerca');
+        return [];
+    }
     
+    console.log(`🔍 Inizio ricerca in ${data.chunks.length} chunks...`);
     const scores = new Map();
     
     // Estrai tutte le keywords dalle domande
@@ -105,34 +109,50 @@ function searchRelevantChunks(questions, data, maxChunks = 20) {
     
     // Rimuovi duplicati
     const uniqueKeywords = [...new Set(allKeywords)];
-    console.log(`🔍 Ricerca con ${uniqueKeywords.length} keywords`);
+    console.log(`📝 Keywords estratte: ${uniqueKeywords.slice(0, 10).join(', ')}...`);
+    console.log(`   Totale keywords uniche: ${uniqueKeywords.length}`);
     
     // Cerca nei chunks
+    let matchCount = 0;
     data.chunks.forEach((chunk, index) => {
         const chunkText = chunk.text.toLowerCase();
         let score = 0;
+        let matchedKeywords = [];
         
         uniqueKeywords.forEach(keyword => {
             if (chunkText.includes(keyword)) {
                 score += 10;
+                matchedKeywords.push(keyword);
             }
         });
         
         if (score > 0) {
-            scores.set(index, score);
+            scores.set(index, { score, matchedKeywords });
+            matchCount++;
         }
     });
     
+    console.log(`📊 Trovati ${matchCount} chunks con corrispondenze`);
+    
     // Ordina per score e prendi i migliori
     const sortedChunks = Array.from(scores.entries())
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].score - a[1].score)
         .slice(0, maxChunks)
-        .map(([index, score]) => ({
+        .map(([index, scoreData]) => ({
             ...data.chunks[index],
-            score
+            score: scoreData.score,
+            matchedKeywords: scoreData.matchedKeywords
         }));
     
-    console.log(`📚 Trovati ${sortedChunks.length} chunks rilevanti`);
+    if (sortedChunks.length > 0) {
+        console.log(`✅ Top 3 chunks per rilevanza:`);
+        sortedChunks.slice(0, 3).forEach((chunk, i) => {
+            console.log(`   ${i+1}. Pagina ${chunk.page} (score: ${chunk.score}) - Keywords: ${chunk.matchedKeywords.slice(0, 5).join(', ')}`);
+        });
+    } else {
+        console.log('⚠️ ATTENZIONE: Nessun chunk rilevante trovato!');
+    }
+    
     return sortedChunks;
 }
 
@@ -272,23 +292,40 @@ IMPORTANTE: Restituisci SOLO il JSON, niente altro testo.`;
 
         // STEP 2: Cerca nel documento se disponibile
         let context = '';
+        let pagesReferenced = [];
+        
         if (data && data.chunks && questions.length > 0) {
-            const relevantChunks = searchRelevantChunks(questions, data);
-            context = relevantChunks
-                .map(chunk => `[Pag. ${chunk.page}] ${chunk.text}`)
-                .join('\n\n---\n\n');
-            console.log(`📚 Usando ${relevantChunks.length} sezioni del documento`);
+            console.log(`🔍 Ricerca in ${data.chunks.length} chunks disponibili...`);
+            const relevantChunks = searchRelevantChunks(questions, data, 30); // Aumentato a 30 chunks
+            
+            if (relevantChunks.length > 0) {
+                context = relevantChunks
+                    .map(chunk => `[Pagina ${chunk.page}] ${chunk.text}`)
+                    .join('\n\n---\n\n');
+                
+                pagesReferenced = [...new Set(relevantChunks.map(c => c.page))];
+                console.log(`📚 Trovati ${relevantChunks.length} chunks rilevanti dalle pagine: ${pagesReferenced.join(', ')}`);
+            } else {
+                console.log('⚠️ Nessun chunk rilevante trovato');
+            }
+        } else {
+            console.log('⚠️ Nessun documento disponibile o nessuna domanda estratta');
         }
 
         // STEP 3: Analisi finale con contesto
-        console.log('🎯 Analisi finale...');
+        console.log('🎯 Analisi finale con contesto...');
         
-        const analysisPrompt = `${context ? `CONTESTO DAL DOCUMENTO DI RIFERIMENTO:
+        const analysisPrompt = `${context ? `IMPORTANTE: USA QUESTO CONTESTO DAL DOCUMENTO DEL CORSO (795 PAGINE):
+
 ${context}
 
-Usa questo contesto per rispondere con maggiore accuratezza.
+ISTRUZIONI CRITICHE:
+- DEVI basare le tue risposte PRINCIPALMENTE sul contesto fornito sopra
+- Quando trovi informazioni nel contesto, cita SEMPRE la pagina specifica
+- Se una risposta è nel contesto, dai accuratezza 90-100%
+- Se NON trovi info nel contesto, puoi usare conoscenza generale ma indica "Fonte: Conoscenza generale" con accuratezza 50-70%
 
-` : ''}Analizza il quiz e fornisci le risposte.
+` : 'NOTA: Nessun contesto documento disponibile. Usa la tua conoscenza generale.\n\n'}Analizza il quiz e fornisci le risposte.
 
 DOMANDE:
 ${questions.map((q, i) => `
