@@ -2,7 +2,7 @@
 
 // URL base per i file preprocessati su GitHub
 // IMPORTANTE: Sostituisci con il tuo username e repository
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/TUO_USERNAME/TUO_REPO/main/data/processed-v2/';
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/gianca-oss/quiz-enhanced/main/data/processed-v2/';
 
 // Cache per i dati
 let dataCache = null;
