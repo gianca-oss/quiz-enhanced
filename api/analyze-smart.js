@@ -1,6 +1,6 @@
 // api/analyze-smart.js - API ottimizzata con approccio ibrido Haiku/Sonnet
 
-const fs = require('fs').promises;
+const { promises: fs } = require('fs');
 const path = require('path');
 
 // Cache per i dati preprocessati
