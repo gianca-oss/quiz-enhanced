@@ -1133,5 +1133,91 @@ Formatta la risposta come una semplice tabella HTML e poi aggiungi le spiegazion
     }
 }
 
-// Esporta la funzione alla fine del file prima di export default
-module.exports.simpleDirectAnalysis = simpleDirectAnalysis;
+/**
+ * Analisi diretta senza documento - tabella semplificata
+ */
+async function directAnalysisWithoutDoc(req, res, apiKey, imageContent, imageMetadata, strategy) {
+    console.log('📋 Analisi diretta senza documento');
+    
+    try {
+        let prompt = `Analizza il quiz nell'immagine.
+
+${imageMetadata ? `METADATI IMMAGINE:
+- Qualità stimata: ${imageMetadata.estimatedQuality} (${imageMetadata.sizeKB}KB)
+${imageMetadata.estimatedQuality === 'low' ? '- ATTENZIONE: Immagine a bassa qualità' : ''}
+
+` : ''}IMPORTANTE: Non ho accesso al documento di riferimento, userò la conoscenza generale.
+
+GENERA:
+
+1. TABELLA A 3 COLONNE (USA SOLO CLASSI CSS, NO STILI INLINE):
+<table class="quiz-results-table">
+<thead>
+<tr>
+<th>N°</th>
+<th>Risposta</th>
+<th>Accuratezza</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="question-number">1</td>
+<td class="answer-letter">[A/B/C/D]</td>
+<td class="accuracy-percentage">[XX%]</td>
+</tr>
+<!-- continua per tutte le domande -->
+</tbody>
+</table>
+
+2. ANALISI DETTAGLIATA:
+<div class="question-analysis">
+<h4>Domanda [numero]</h4>
+<p class="question-text">[trascrivi domanda completa]</p>
+<p class="answer-explanation"><strong>Risposta: [lettera]</strong> - [spiegazione]</p>
+<p class="source-info">Fonte: Conoscenza generale (documento non disponibile)</p>
+</div>
+
+Nota: le percentuali saranno basse (40-60%) senza documento di riferimento.`;
+
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: strategy.analysisModel,
+                max_tokens: strategy.analysisMaxTokens,
+                temperature: 0.1,
+                messages: [{
+                    role: 'user',
+                    content: [imageContent, { type: 'text', text: prompt }]
+                }]
+            })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            console.error('Errore in directAnalysisWithoutDoc:', data);
+            throw new Error(data.error?.message || 'Errore API');
+        }
+
+        res.status(200).json({
+            content: data.content,
+            metadata: {
+                processingMethod: 'direct-no-document-simplified',
+                analysisModel: strategy.analysisModel,
+                documentUsed: false,
+                imageMetadata,
+                warning: `Analisi basata solo su conoscenza generale${imageMetadata && imageMetadata.estimatedQuality === 'low' ? ' con immagine a bassa qualità' : ''}`
+            }
+        });
+        
+    } catch (error) {
+        console.error('Errore in directAnalysisWithoutDoc:', error);
+        // Prova con fallback semplice
+        return simpleDirectAnalysis(req, res, apiKey, imageContent, imageMetadata, strategy);
+    }
+}
