@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const pdfParse = require('pdf-parse');
 
-const INPUT_PDF = './corso_completo.pdf';
+const INPUT_PDF = './data/source/corso_completo.pdf';
 const OUTPUT_DIR = './data/processed-v3';
 const CHUNK_SIZE = 1500; // Aumentato per contesto migliore
 const CHUNK_OVERLAP = 300; // Overlap maggiore per non perdere informazioni
